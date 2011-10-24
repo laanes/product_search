@@ -1,6 +1,6 @@
-<?php 
+<?php require_once('modules/3rdparty/product_loader/classes/page_model.php');  
 
-class Product_Search_Component 
+class Product_Search_Component extends Page_Model
 {
 	
 	var $pattern = "/([a-zA-Z0-9\.])+-([a-zA-Z0-9_-])+/";
@@ -13,13 +13,34 @@ class Product_Search_Component
 	var $search_word;
 	var $noKeys;
 	var $noKeys2;
+	var $result_count;
+	var $image_path;
+	var $stock_levels;
+	var $cat_name;
+	var $product_links;
+	var $stock;
+	var $search_query;
 
-	public function __construct( $needle ) {
+	public function __construct( $needle = "" ) {
+
+		$this->needle = $needle;
+			
+		if( !empty( $this->needle ) ) {
+
+		$this->setup();
+
+		}
+
+	}
+
+	private function setup() {
 		
-	$this->needle = $needle;
-	$this->filter();
-	$this->go_bear();
-	$this->get_results();
+		$this->filter();
+		$this->go_bear();
+		$this->get_results();
+		$this->count_results();
+		$this->set_product_properties();
+		$this->create_product_links();
 
 	}
 
@@ -190,21 +211,110 @@ class Product_Search_Component
 
 
 
-		$search = sprintf("SELECT DISTINCT(I.productId), I.*, %2\$s AS SearchScore FROM %1\$sCubeCart_inventory AS I , %1\$sCubeCart_category AS C WHERE (%6\$s) >= %4\$s ".$prod_filters." AND C.cat_id > 0 %3\$s %5\$s", $glob['dbprefix'], $matchString, $this->where_condition, $this->noKeys1, $orderSort, $matchString1);
+		$search = sprintf(
+
+			"SELECT DISTINCT(I.productId), I.*, C.cat_name, C.cat_father_id, %2\$s 
+			AS SearchScore 
+			FROM %1\$sCubeCart_inventory AS I 
+			JOIN %1\$sCubeCart_category AS C 
+			ON I.cat_id = C.cat_id 
+			WHERE (%6\$s) >= %4\$s ".$prod_filters." 
+			AND C.cat_id > 0 %3\$s %5\$s", 
+			$glob['dbprefix'], $matchString, 
+			$this->where_condition, 
+			$this->noKeys1, 
+			$orderSort, 
+			$matchString1 
+
+			);
 
 		} 
 
 		else {
 
-		$search = sprintf("SELECT DISTINCT(I.productId), I.* FROM %1\$sCubeCart_inventory AS I, %1\$sCubeCart_category AS C WHERE I.cat_id > 0 %2\$s %3\$s", $glob['dbprefix'], $this->where_condition, $orderSort);
+		$search = sprintf(
+			"SELECT DISTINCT(I.productId), I.*, C.cat_name, C.cat_father_id 
+			FROM %1\$sCubeCart_inventory AS I
+			JOIN %1\$sCubeCart_category AS C 
+			ON I.cat_id = C.cat_id 
+			WHERE I.cat_id > 0 %2\$s %3\$s", 
+			$glob['dbprefix'], 
+			$this->where_condition, 
+			$orderSort);
 
 		}	
 
 		$productListQuery = $search;
 
-		$this->product_results = $db->select($productListQuery, $config['productPages'], $page);
+		$this->product_results = $db->select($productListQuery, parent::$limit, parent::$page);
 
 		}
+
+		$this->search_query = $productListQuery;
+
+	}
+
+	private function count_results() {
+		
+	$this->result_count = count($this->product_results);
+
+	}
+
+	private function set_product_properties() {
+
+		global $glob;
+			
+		foreach($this->product_results as $key => $value):
+
+			$image_path[] = $glob['storeURL'] . "/images/uploads/productImages/" . str_replace('productImages/', '', $value['image']);;
+
+			$stock[] = ($value['stock_level'] !== 0) ? "In Stock" : false;
+
+			$cat_name[] = $value['cat_name'];
+
+		endforeach;
+
+		$this->image_paths 	= $image_path;
+
+		$this->stock = $stock;
+
+		$this->cat_name = $cat_name;
+
+	}
+
+	private function create_product_links() {
+
+	global $glob;
+		
+		foreach($this->product_results as $key => $product):
+
+			$link[] = $glob['storeURL'];
+
+			$father = $this->cat_father_by_id($product['cat_father_id']);
+
+			$grand_father = $this->cat_father_by_id($father[0]['cat_father_id']);
+
+				if($grand_father[0]['cat_name']) {
+
+					$link[] = $grand_father[0]['cat_name'];
+
+				}
+
+				$link[] = $father[0]['cat_name'];
+
+				$link[] = $product['cat_name'];
+
+				$link[] = $product['name'];
+
+				$link[] = "prod_" . $product['productId'] . ".html";
+
+				$link_chain[] = implode('/', $link);
+
+				unset($link);
+
+		endforeach;
+
+	$this->product_links = $link_chain;
 
 	}
 
