@@ -1,6 +1,6 @@
-<?php require_once('modules/3rdparty/product_loader/classes/page_model.php');  
+<?php  
 
-class Product_Search_Component extends Page_Model
+class Product_Search_Component
 {
 	
 	var $pattern = "/([a-zA-Z0-9\.])+-([a-zA-Z0-9_-])+/";
@@ -15,7 +15,7 @@ class Product_Search_Component extends Page_Model
 	var $noKeys2;
 	var $result_count;
 	var $image_path;
-	var $stock_levels;
+	var $stock_levels;	
 	var $cat_name;
 	var $product_links;
 	var $stock;
@@ -213,7 +213,7 @@ class Product_Search_Component extends Page_Model
 
 		$search = sprintf(
 
-			"SELECT DISTINCT(I.productId), I.*, C.cat_name, C.cat_father_id, %2\$s 
+			"SELECT DISTINCT(I.productId), I.*, /*C.cat_name, C.cat_father_id,*/%2\$s 
 			AS SearchScore 
 			FROM %1\$sCubeCart_inventory AS I 
 			JOIN %1\$sCubeCart_category AS C 
@@ -246,7 +246,7 @@ class Product_Search_Component extends Page_Model
 
 		$productListQuery = $search;
 
-		$this->product_results = $db->select($productListQuery, parent::$limit, parent::$page);
+		$this->product_results = $db->select($productListQuery, 6, $_GET['page']);
 
 		}
 
@@ -315,6 +315,22 @@ class Product_Search_Component extends Page_Model
 		endforeach;
 
 	$this->product_links = $link_chain;
+
+	}
+
+	private function cat_father_by_id( $cat_id ) {
+
+	global $db;
+
+	$sql = 
+	"SELECT cat_father_id, cat_name 
+	FROM CubeCart_category 
+	WHERE cat_id = 5 
+	LIMIT 1";
+
+	$cat_name = $db->select($sql);
+
+	return $cat_name;
 
 	}
 
